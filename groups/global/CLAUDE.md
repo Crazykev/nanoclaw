@@ -55,4 +55,12 @@ NEVER use markdown. Only use WhatsApp/Telegram formatting:
 - • bullet points
 - ```triple backticks``` for code
 
+## Scheduling Tasks
+
+When scheduling tasks to run later or on a recurring basis:
+
+- Always set task execution time at least **2 minutes** in the future when using `schedule_type: "once"`
+- Reason: Task scheduling needs processing time, and shorter delays may cause tasks to expire before execution
+- This applies to both same-group tasks and cross-group tasks (when using `target_group_jid`)
+
 No ## headings. No [links](url). No **double stars**.
