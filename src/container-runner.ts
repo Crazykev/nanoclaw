@@ -4,6 +4,7 @@
  */
 import { ChildProcess, exec, spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import {
@@ -62,7 +63,11 @@ function buildVolumeMounts(
   const projectRoot = process.cwd();
   const groupDir = resolveGroupFolderPath(group.folder);
 
-  if (isMain) {
+  // Grant privileged mounts (Docker socket, SSH keys, kubectl) to main group
+  // or groups explicitly configured with privilegedAccess flag
+  const hasPrivilegedAccess = isMain || group.privilegedAccess === true;
+
+  if (hasPrivilegedAccess) {
     // Main gets the project root read-only. Writable paths the agent needs
     // (group folder, IPC, .claude/) are mounted separately below.
     // Read-only prevents the agent from modifying host application code
@@ -80,6 +85,48 @@ function buildVolumeMounts(
       containerPath: '/workspace/group',
       readonly: false,
     });
+
+    // Docker socket (SECURITY WARNING: container escape capability)
+    const dockerSocketPath = '/var/run/docker.sock';
+    if (fs.existsSync(dockerSocketPath)) {
+      mounts.push({
+        hostPath: dockerSocketPath,
+        containerPath: dockerSocketPath,
+        readonly: false, // Must be writable
+      });
+      logger.info({ group: group.name, folder: group.folder }, 'Mounting Docker socket (privileged access)');
+    }
+
+    // SSH keys for git (read-only)
+    const homeDir = os.homedir();
+    const sshDir = path.join(homeDir, '.ssh');
+    if (fs.existsSync(sshDir)) {
+      mounts.push({
+        hostPath: sshDir,
+        containerPath: '/home/node/.ssh',
+        readonly: true,
+      });
+    }
+
+    // Kubernetes config for kubectl (read-only)
+    const kubeDir = path.join(homeDir, '.kube');
+    if (fs.existsSync(kubeDir)) {
+      mounts.push({
+        hostPath: kubeDir,
+        containerPath: '/home/node/.kube',
+        readonly: true,
+      });
+    }
+
+    // Docker CLI config (read-only)
+    const dockerConfigDir = path.join(homeDir, '.docker');
+    if (fs.existsSync(dockerConfigDir)) {
+      mounts.push({
+        hostPath: dockerConfigDir,
+        containerPath: '/home/node/.docker',
+        readonly: true,
+      });
+    }
   } else {
     // Other groups only get their own folder
     mounts.push({
@@ -210,6 +257,7 @@ function readSecrets(): Record<string, string> {
 function buildContainerArgs(
   mounts: VolumeMount[],
   containerName: string,
+  group: RegisteredGroup,
 ): string[] {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
@@ -224,6 +272,27 @@ function buildContainerArgs(
   if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
     args.push('--user', `${hostUid}:${hostGid}`);
     args.push('-e', 'HOME=/home/node');
+  }
+
+  // Add docker group for socket access
+  const dockerSocket = mounts.find((m) => m.hostPath === '/var/run/docker.sock');
+  if (dockerSocket) {
+    try {
+      const stat = fs.statSync('/var/run/docker.sock');
+      const dockerGid = stat.gid;
+      args.push('--group-add', dockerGid.toString());
+      logger.debug({ dockerGid }, 'Added docker group for socket access');
+    } catch (err) {
+      logger.warn({ err }, 'Failed to stat docker socket for GID');
+    }
+  }
+
+  // Add extra hosts (--add-host) for custom DNS mappings
+  if (group.containerConfig?.extraHosts) {
+    for (const host of group.containerConfig.extraHosts) {
+      args.push('--add-host', host);
+      logger.debug({ group: group.name, host }, 'Added extra host mapping');
+    }
   }
 
   for (const mount of mounts) {
@@ -253,7 +322,7 @@ export async function runContainerAgent(
   const mounts = buildVolumeMounts(group, input.isMain);
   const safeName = group.folder.replace(/[^a-zA-Z0-9-]/g, '-');
   const containerName = `nanoclaw-${safeName}-${Date.now()}`;
-  const containerArgs = buildContainerArgs(mounts, containerName);
+  const containerArgs = buildContainerArgs(mounts, containerName, group);
 
   logger.debug(
     {

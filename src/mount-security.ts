@@ -25,16 +25,15 @@ let allowlistLoadError: string | null = null;
 
 /**
  * Default blocked patterns - paths that should never be mounted
+ * NOTE: .ssh, .kube, and .docker are NOT blocked to allow DevOps operations
+ * Individual key files are still blocked for partial protection
  */
 const DEFAULT_BLOCKED_PATTERNS = [
-  '.ssh',
   '.gnupg',
   '.gpg',
   '.aws',
   '.azure',
   '.gcloud',
-  '.kube',
-  '.docker',
   'credentials',
   '.env',
   '.netrc',

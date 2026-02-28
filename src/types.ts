@@ -30,6 +30,7 @@ export interface AllowedRoot {
 export interface ContainerConfig {
   additionalMounts?: AdditionalMount[];
   timeout?: number; // Default: 300000 (5 minutes)
+  extraHosts?: string[]; // Docker --add-host entries (format: "hostname:ip")
 }
 
 export interface RegisteredGroup {
@@ -39,6 +40,7 @@ export interface RegisteredGroup {
   added_at: string;
   containerConfig?: ContainerConfig;
   requiresTrigger?: boolean; // Default: true for groups, false for solo chats
+  privilegedAccess?: boolean; // Grant Docker socket, SSH keys, kubectl access (DevOps mode)
 }
 
 export interface NewMessage {
