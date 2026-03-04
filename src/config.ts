@@ -8,7 +8,6 @@ import { readEnvFile } from './env.js';
 const envConfig = readEnvFile([
   'ASSISTANT_NAME',
   'ASSISTANT_HAS_OWN_NUMBER',
-  'SLACK_ONLY',
 ]);
 
 export const ASSISTANT_NAME =
@@ -32,7 +31,6 @@ export const MOUNT_ALLOWLIST_PATH = path.join(
 export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
 export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
 export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
-export const MAIN_GROUP_FOLDER = 'main';
 
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'nanoclaw-agent:latest';
@@ -67,9 +65,3 @@ export const TRIGGER_PATTERN = new RegExp(
 // Uses system timezone by default
 export const TIMEZONE =
   process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-// Slack configuration
-// SLACK_BOT_TOKEN and SLACK_APP_TOKEN are read directly by SlackChannel
-// from .env via readEnvFile() to keep secrets off process.env.
-export const SLACK_ONLY =
-  (process.env.SLACK_ONLY || envConfig.SLACK_ONLY) === 'true';

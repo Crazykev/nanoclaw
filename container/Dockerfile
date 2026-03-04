@@ -21,6 +21,7 @@ fi
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
+    fonts-noto-cjk \
     fonts-noto-color-emoji \
     libgbm1 \
     libnss3 \
