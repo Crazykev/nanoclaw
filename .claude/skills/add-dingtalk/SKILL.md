@@ -12,6 +12,20 @@ The implementation uses:
 - Stream Mode (no public webhook URL)
 - Group messages that `@` the bot
 
+## Changelog
+
+### v1.0.1 (2026-03-16)
+- **Fixed:** Corrected `conversationType` detection logic according to official DingTalk documentation
+  - `conversationType: '1'` = private/single chat
+  - `conversationType: '2'` = group chat
+  - Previously the logic was reversed, causing `/chatid` to show incorrect chat types
+- **Fixed:** Added message deduplication to prevent duplicate `/chatid` responses
+  - Caches last 1000 message IDs to filter duplicate messages from DingTalk SDK
+- **Added:** Test cases for message deduplication and private chat `/chatid` handling
+
+### v1.0.0 (Initial Release)
+- Initial DingTalk channel implementation
+
 ## Phase 1: Pre-flight
 
 ### Check if already applied

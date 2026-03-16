@@ -66,6 +66,7 @@ export class DingTalkChannel implements Channel {
   private readonly clientSecret: string;
   private readonly opts: DingTalkChannelOpts;
   private readonly sessionWebhooks = new Map<string, SessionWebhookCacheEntry>();
+  private readonly processedMessages = new Set<string>();
 
   constructor(
     clientId: string,
@@ -138,6 +139,7 @@ export class DingTalkChannel implements Channel {
 
     this.client = null;
     this.sessionWebhooks.clear();
+    this.processedMessages.clear();
     logger.info('DingTalk bot disconnected');
   }
 
@@ -152,6 +154,22 @@ export class DingTalkChannel implements Channel {
     if (!raw?.conversationId) {
       logger.warn({ payload }, 'Invalid DingTalk robot payload');
       return;
+    }
+
+    // Deduplicate messages using msgId
+    const messageId = raw.msgId || payload.headers?.messageId;
+    if (messageId) {
+      if (this.processedMessages.has(messageId)) {
+        logger.debug({ messageId }, 'Ignoring duplicate DingTalk message');
+        return;
+      }
+      this.processedMessages.add(messageId);
+
+      // Clean up old message IDs (keep last 1000)
+      if (this.processedMessages.size > 1000) {
+        const toDelete = Array.from(this.processedMessages).slice(0, 100);
+        toDelete.forEach(id => this.processedMessages.delete(id));
+      }
     }
 
     const chatJid = `ding:${raw.conversationId}`;
@@ -185,10 +203,9 @@ export class DingTalkChannel implements Channel {
     }
 
     const content = this.normalizeInboundContent(raw, rawText);
-    const messageId = raw.msgId || payload.headers?.messageId || timestamp;
 
     this.opts.onMessage(chatJid, {
-      id: messageId,
+      id: messageId || timestamp,
       chat_jid: chatJid,
       sender,
       sender_name: senderName,
@@ -261,8 +278,9 @@ export class DingTalkChannel implements Channel {
   }
 
   private isGroupConversation(conversationType?: string): boolean {
-    if (conversationType === '2') return false;
-    return true;
+    // conversationType: '1' = private/single chat, '2' = group chat
+    // Reference: https://open.dingtalk.com/document/development/receive-message
+    return conversationType === '2';
   }
 
   private rememberSessionWebhook(

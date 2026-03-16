@@ -90,7 +90,7 @@ function createRobotPayload(overrides?: Partial<Record<string, any>>) {
     msgId: 'msg-001',
     msgtype: 'text',
     conversationId: 'cid-group',
-    conversationType: '1',
+    conversationType: '2', // '2' = group chat
     conversationTitle: 'Engineering',
     senderId: 'user-001',
     senderStaffId: 'staff-001',
@@ -252,7 +252,7 @@ describe('DingTalkChannel', () => {
       );
     });
 
-    it('marks conversationType=2 as a private chat', async () => {
+    it('marks conversationType=1 as a private chat', async () => {
       const opts = createTestOpts();
       const channel = new DingTalkChannel('client-id', 'client-secret', opts);
       await channel.connect();
@@ -260,7 +260,7 @@ describe('DingTalkChannel', () => {
       await triggerRobotMessage(
         createRobotPayload({
           conversationId: 'cid-private',
-          conversationType: '2',
+          conversationType: '1', // '1' = private chat
           conversationTitle: undefined,
           senderNick: 'Alice',
           isInAtList: false,
@@ -273,7 +273,7 @@ describe('DingTalkChannel', () => {
         '2024-01-01T00:00:00.000Z',
         'Alice',
         'dingtalk',
-        false,
+        false, // isGroup should be false
       );
       expect(opts.onMessage).toHaveBeenCalledWith(
         'ding:cid-private',
@@ -296,6 +296,54 @@ describe('DingTalkChannel', () => {
       );
 
       expect(opts.onMessage).not.toHaveBeenCalled();
+    });
+
+    it('deduplicates messages with the same msgId', async () => {
+      const opts = createTestOpts();
+      const channel = new DingTalkChannel('client-id', 'client-secret', opts);
+      await channel.connect();
+
+      const payload = createRobotPayload({
+        msgId: 'duplicate-msg-id',
+        text: { content: '@Andy hello' },
+      });
+
+      // Send the same message twice
+      await triggerRobotMessage(payload);
+      await triggerRobotMessage(payload);
+
+      // Should only process it once
+      expect(opts.onMessage).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled(); // No /chatid response
+    });
+
+    it('handles /chatid in private chat correctly', async () => {
+      const opts = createTestOpts({
+        registeredGroups: vi.fn(() => ({})),
+      });
+      const channel = new DingTalkChannel('client-id', 'client-secret', opts);
+      await channel.connect();
+
+      await triggerRobotMessage(
+        createRobotPayload({
+          conversationId: 'cid-private',
+          conversationType: '1', // '1' = private chat
+          text: { content: '/chatid' },
+        }),
+      );
+
+      expect(opts.onMessage).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://example.com/session',
+        expect.objectContaining({
+          body: JSON.stringify({
+            msgtype: 'text',
+            text: {
+              content: 'Chat ID: ding:cid-private\nType: private',
+            },
+          }),
+        }),
+      );
     });
   });
 

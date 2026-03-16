@@ -1,6 +1,6 @@
 skill: dingtalk
-version: 1.0.0
-description: "DingTalk app bot integration via Stream Mode for @-mention group messages"
+version: 1.0.1
+description: "DingTalk app bot integration via Stream Mode for @-mention group messages (Fixed: conversationType detection and message deduplication)"
 core_version: 0.1.0
 adds:
   - src/channels/dingtalk.ts
