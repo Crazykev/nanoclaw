@@ -76,7 +76,7 @@ function createSchema(database: Database.Database): void {
     CREATE TABLE IF NOT EXISTS registered_groups (
       jid TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      folder TEXT NOT NULL UNIQUE,
+      folder TEXT NOT NULL,
       trigger_pattern TEXT NOT NULL,
       added_at TEXT NOT NULL,
       container_config TEXT,
@@ -147,6 +147,55 @@ function createSchema(database: Database.Database): void {
     );
   } catch {
     /* column already exists */
+  }
+
+  // Remove UNIQUE constraint from folder column to allow multiple JIDs to share the same agent instance
+  try {
+    // Check if the constraint exists by checking the schema
+    const tableInfo = database
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE type='table' AND name='registered_groups'`,
+      )
+      .get() as { sql: string } | undefined;
+
+    if (tableInfo?.sql?.includes('folder TEXT NOT NULL UNIQUE')) {
+      // Recreate table without UNIQUE constraint
+      database.exec(`
+        BEGIN TRANSACTION;
+
+        -- Create new table without UNIQUE constraint on folder
+        CREATE TABLE registered_groups_new (
+          jid TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          folder TEXT NOT NULL,
+          trigger_pattern TEXT NOT NULL,
+          added_at TEXT NOT NULL,
+          container_config TEXT,
+          requires_trigger INTEGER DEFAULT 1,
+          is_main INTEGER DEFAULT 0,
+          privileged_access INTEGER DEFAULT 0
+        );
+
+        -- Copy data from old table
+        INSERT INTO registered_groups_new
+        SELECT jid, name, folder, trigger_pattern, added_at, container_config, requires_trigger, is_main, privileged_access
+        FROM registered_groups;
+
+        -- Drop old table
+        DROP TABLE registered_groups;
+
+        -- Rename new table
+        ALTER TABLE registered_groups_new RENAME TO registered_groups;
+
+        COMMIT;
+      `);
+      logger.info(
+        'Migration: Removed UNIQUE constraint from registered_groups.folder to allow shared agent instances',
+      );
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Migration: Failed to remove UNIQUE constraint from registered_groups.folder');
+    /* migration failed or already applied */
   }
 }
 

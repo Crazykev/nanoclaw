@@ -6,6 +6,8 @@ Personal Claude assistant. See [README.md](README.md) for philosophy and setup. 
 
 Single Node.js process that connects to WhatsApp, routes messages to Claude Agent SDK running in containers (Linux VMs). Each group has isolated filesystem and memory.
 
+**Shared Agent Instances**: Multiple channels (group chats, private chats) can route to the same agent instance by registering them to the same folder. Use `scripts/register-shared-channel.js` to add a second channel to an existing agent.
+
 ## Key Files
 
 | File | Purpose |
