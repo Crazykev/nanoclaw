@@ -345,8 +345,11 @@ export class DingTalkChannel implements Channel {
           'x-acs-dingtalk-access-token': accessToken,
         },
         body: JSON.stringify({
-          msgtype: 'text',
-          text: { content: chunk },
+          msgtype: 'markdown',
+          markdown: {
+            title: ASSISTANT_NAME,
+            text: chunk,
+          },
         }),
       });
 

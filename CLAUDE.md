@@ -8,6 +8,8 @@ Single Node.js process that connects to WhatsApp, routes messages to Claude Agen
 
 **Shared Agent Instances**: Multiple channels (group chats, private chats) can route to the same agent instance by registering them to the same folder. Use `scripts/register-shared-channel.js` to add a second channel to an existing agent.
 
+**Group Git Version Control**: Each group folder can be version-controlled with git to track configuration and memory changes. See [docs/GROUP_GIT.md](docs/GROUP_GIT.md) for details. Initialize with `./scripts/init-group-git.sh <group-name>`.
+
 ## Key Files
 
 | File | Purpose |
